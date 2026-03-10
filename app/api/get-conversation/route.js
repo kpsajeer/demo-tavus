@@ -7,7 +7,6 @@ export async function POST(req) {
     {
       method: "GET",
       headers: {
-        "Content-Type": "application/json",
         "x-api-key": process.env.TAVUS_API_KEY
       }
     }
@@ -15,5 +14,9 @@ export async function POST(req) {
 
   const data = await res.json();
 
-  return Response.json(data);
+  return Response.json({
+    conversation_id: data.conversation_id,
+    conversation_url: data.conversation_url
+  });
+
 }
