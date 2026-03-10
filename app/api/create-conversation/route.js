@@ -1,14 +1,18 @@
 export async function POST(req) {
 
-  const { id } = await req.json();
+  const { persona } = await req.json();
 
   const res = await fetch(
-    `https://tavusapi.com/v2/conversations/${id}`,
+    "https://tavusapi.com/v2/conversations",
     {
-      method: "GET",
+      method: "POST",
       headers: {
+        "Content-Type": "application/json",
         "x-api-key": process.env.TAVUS_API_KEY
-      }
+      },
+      body: JSON.stringify({
+        persona_id: persona
+      })
     }
   );
 

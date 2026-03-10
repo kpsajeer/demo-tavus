@@ -31,12 +31,14 @@ export default function Page({ params }) {
         setMessages([]);
         const Daily = (await import("@daily-co/daily-js")).default;
 
-        const res = await fetch("/api/get-conversation", {
+        const res = await fetch("/api/create-conversation", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify({ id })
+            body: JSON.stringify({
+                persona: id
+            })
         });
 
         const data = await res.json();
