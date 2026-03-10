@@ -11,7 +11,8 @@ export async function POST(req) {
         "x-api-key": process.env.TAVUS_API_KEY
       },
       body: JSON.stringify({
-        persona_id: persona
+        persona_id: process.env.TAVUS_PERSONA_ID,
+        replica_id: process.env.TAVUS_REPLICA_ID
       })
     }
   );
