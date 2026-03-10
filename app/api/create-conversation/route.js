@@ -1,6 +1,4 @@
-export async function POST(req) {
-
-  const { persona } = await req.json();
+export async function POST() {
 
   const res = await fetch(
     "https://tavusapi.com/v2/conversations",
@@ -11,17 +9,16 @@ export async function POST(req) {
         "x-api-key": process.env.TAVUS_API_KEY
       },
       body: JSON.stringify({
-        persona_id: process.env.TAVUS_PERSONA_ID,
-        replica_id: process.env.TAVUS_REPLICA_ID
+        persona_id: process.env.PERSONA_ID,
+        replica_id: process.env.REPLICA_ID,
+        conversation_name: "Demo",
       })
     }
   );
 
-  const data = await res.json();
+  const text = await res.text();
 
-  return Response.json({
-    conversation_id: data.conversation_id,
-    conversation_url: data.conversation_url
+  return new Response(text, {
+    headers: { "Content-Type": "application/json" }
   });
-
 }

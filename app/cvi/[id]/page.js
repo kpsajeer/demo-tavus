@@ -1,9 +1,9 @@
 "use client";
-import { useRef, useState, use, useEffect } from "react";
 
-export default function Page({ params }) {
+import { useRef, useState, useEffect } from "react";
+import Daily from "@daily-co/daily-js";
 
-    const { id } = use(params);
+export default function Page() {
 
     const videoContainerRef = useRef(null);
     const callObjectRef = useRef(null);
@@ -13,7 +13,6 @@ export default function Page({ params }) {
     const [conversationId, setConversationId] = useState(null);
     const [question, setQuestion] = useState("");
     const [messages, setMessages] = useState([]);
-
     const [sending, setSending] = useState(false);
 
     useEffect(() => {
@@ -27,65 +26,112 @@ export default function Page({ params }) {
 
     async function startConversation() {
 
-        setConnecting(true);
-        setMessages([]);
-        const Daily = (await import("@daily-co/daily-js")).default;
+        try {
 
-        const res = await fetch("/api/create-conversation", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                persona: id
-            })
-        });
+            setConnecting(true);
+            setMessages([]);
 
-        const data = await res.json();
+            const res = await fetch("/api/create-conversation", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                }
+            });
 
-        setConversationId(data.conversation_id);
+            const data = await res.json();
 
-        const callObject = Daily.createCallObject();
-        callObjectRef.current = callObject;
+            console.log("Tavus response:", data);
 
-        // Render video tracks
-        callObject.on("track-started", (event) => {
+            if (!data.conversation_url) {
+                console.error("No conversation_url returned");
+                setConnecting(false);
+                alert("Failed to start avatar session");
+                return;
+            }
 
-            if (event.track.kind !== "video") return;
-            if (!videoContainerRef.current) return;
+            setConversationId(data.conversation_id);
 
-            const video = document.createElement("video");
+            const callObject = Daily.createCallObject();
+            callObjectRef.current = callObject;
 
-            video.srcObject = new MediaStream([event.track]);
-            video.autoplay = true;
-            video.playsInline = true;
+            callObject.on("joining-meeting", () => {
+                console.log("Joining meeting...");
+            });
 
-            video.style.width = "100%";
-            video.style.height = "100%";
-            video.style.objectFit = "cover";
-            video.style.borderRadius = "10px";
+            callObject.on("joined-meeting", () => {
+                console.log("Joined meeting");
+                setConnecting(false);
+                setStarted(true);
+            });
 
-            videoContainerRef.current.innerHTML = "";
-            videoContainerRef.current.appendChild(video);
+            callObject.on("error", (e) => {
+                console.error("Daily error:", e);
+                setConnecting(false);
+            });
 
+            callObject.on("track-started", (event) => {
+                if (event.track.kind === "video") {
+
+                    if (!videoContainerRef.current) return;
+
+                    const video = document.createElement("video");
+
+                    video.srcObject = new MediaStream([event.track]);
+                    video.autoplay = true;
+                    video.playsInline = true;
+
+                    video.style.width = "100%";
+                    video.style.height = "100%";
+                    video.style.objectFit = "cover";
+                    video.style.borderRadius = "10px";
+
+                    videoContainerRef.current.innerHTML = "";
+                    videoContainerRef.current.appendChild(video);
+                }
+
+                // AUDIO TRACK
+                if (event.track.kind === "audio") {
+
+                    const audio = document.createElement("audio");
+
+                    audio.srcObject = new MediaStream([event.track]);
+                    audio.autoplay = true;
+
+                    // Important for browser autoplay
+                    audio.onloadedmetadata = () => {
+                        audio.play().catch(err => {
+                            console.log("Audio autoplay blocked:", err);
+                        });
+                    };
+
+                    document.body.appendChild(audio);
+                }
+            });
+
+            callObject.on("left-meeting", () => {
+                console.log("Left meeting");
+                setStarted(false);
+                setConnecting(false);
+            });
+
+            await callObject.join({
+                url: data.conversation_url,
+                userName: "Guest",
+                videoSource: false,
+                audioSource: true
+            });
+
+        } catch (err) {
+            console.error("Start conversation error:", err);
             setConnecting(false);
-            setStarted(true);
-        });
-
-        await callObject.join({
-            url: data.conversation_url
-        });
-
-        callObject.on("left-meeting", () => {
-            setStarted(false);
-            setConnecting(false);
-        });
+        }
 
     }
 
     async function sendQuestion() {
 
         if (!question.trim() || sending) return;
+
         setSending(true);
 
         const newMessages = [
@@ -95,30 +141,37 @@ export default function Page({ params }) {
 
         setMessages(newMessages);
 
-        const res = await fetch("/api/send-message", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                conversation_id: conversationId,
-                message: question
-            })
-        });
+        try {
 
-        const data = await res.json();
+            const res = await fetch("/api/send-message", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    conversation_id: conversationId,
+                    message: question
+                })
+            });
 
-        if (data.response) {
+            const data = await res.json();
 
-            setMessages([
-                ...newMessages,
-                {
-                    role: "avatar",
-                    text: data.response
-                }
-            ]);
+            if (data.response) {
 
+                setMessages([
+                    ...newMessages,
+                    {
+                        role: "avatar",
+                        text: data.response
+                    }
+                ]);
+
+            }
+
+        } catch (err) {
+            console.error("Send message error:", err);
         }
+
         setSending(false);
         setQuestion("");
 
@@ -165,6 +218,7 @@ export default function Page({ params }) {
             </div>
         );
     }
+
     if (connecting) {
         return (
             <div style={{
